@@ -5,6 +5,24 @@ import os
 from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 import time
+from discord import opus  # <--- Importă modulul opus
+import ctypes.util
+
+# --- FIX PENTRU WSL/LINUX: ÎNCĂRCARE MANUALĂ OPUS ---
+if not opus.is_loaded():
+    # Caută biblioteca în sistem
+    opus_path = ctypes.util.find_library('opus')
+    if opus_path:
+        print(f"📚 Am găsit libopus la: {opus_path}")
+        opus.load_opus(opus_path)
+    else:
+        # Fallback dacă find_library nu o găsește (uzual în WSL Ubuntu)
+        try:
+            opus.load_opus("libopus.so.0")
+            print("📚 Am încărcat forțat libopus.so.0")
+        except Exception as e:
+            print("❌ CRITIC: Nu pot încărca biblioteca Opus! Audio nu va merge.")
+            print(f"Eroare: {e}")
 
 # ---------------- CONFIGURARE ----------------
 # Încărcăm variabilele
