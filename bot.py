@@ -7,6 +7,7 @@ from faster_whisper import WhisperModel
 import time
 from discord import opus  # <--- Importă modulul opus
 import ctypes.util
+import aiohttp
 
 # --- FIX PENTRU WSL/LINUX: ÎNCĂRCARE MANUALĂ OPUS ---
 if not opus.is_loaded():
@@ -51,7 +52,7 @@ current_voice_client = None
 
 # ---------------- FUNCȚII DE PROCESARE ----------------
 
-def transcrbe_audio(audio_file_path):
+def transcribe_audio(audio_file_path):
     """Primește calea către un wav și returnează textul."""
     try:
         segments, _ = MODEL.transcribe(audio_file_path, beam_size=5)
@@ -61,31 +62,72 @@ def transcrbe_audio(audio_file_path):
         print(f"Eroare Whisper: {e}")
         return ""
 
-async def processing_callback(sink, channel: discord.TextChannel):
-    """
-    Această funcție este apelată automat când se termină o bucată de 5 secunde.
-    Salvam audio -> Transcriem -> Trimitem pe chat.
-    """
-    # Iterăm prin userii care au vorbit în acest interval
+async def check_toxicity(text):
+    """Întreabă API-ul dacă textul e toxic."""
+    async with aiohttp.ClientSession() as session:
+        try:
+            payload = {"text": text, "threshold": 0.5}
+            async with session.post(TOXICITY_API_URL, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("toxic_labels", [])
+        except Exception as e:
+            print(f"⚠️ Nu pot contacta API-ul de toxicitate: {e}")
+            return []
+    return []
+
+async def processing_callback(sink, channel):
     for user_id, audio in sink.audio_data.items():
         if audio:
-            # Salvăm fișierul temporar pentru acest user
-            filename = f"temp_{user_id}.wav"
+            # 1. Salvare Audio
+            filename = f"user_{user_id}_{int(asyncio.get_event_loop().time())}.wav"
             with open(filename, "wb") as f:
                 f.write(audio.file.read())
 
-            # Transcriem (blocant, dar rapid)
-            # Rulăm într-un executor ca să nu blocăm botul de tot
-            text = await asyncio.to_thread(transcrbe_audio, filename)
+            # 2. Transcriere
+            text = await asyncio.to_thread(transcribe_audio, filename)
+            
+            if not text:
+                os.remove(filename)
+                continue
 
-            # Ștergem fișierul temporar (curățenie)
-            os.remove(filename)
+            print(f"🗣️ User {user_id}: {text}")
+            
+            # 3. Verificare Toxicitate
+            toxic_labels = await check_toxicity(text)
+            is_toxic = len(toxic_labels) > 0
 
-            if text:
-                print(f"🗣️ User {user_id} a zis: {text}")
-                # Aici vom pune mai târziu verificarea de toxicitate
-                await channel.send(f"🎤 **Am auzit:** {text}")
+            # --- LOGICA DE DISERTAȚIE ---
+            
+            if BOT_MODE == "REACTIVE":
+                # Modul CLASIC: Se aude tot, pedepsim după.
+                os.remove(filename) # Nu ne mai trebuie sunetul
+                if is_toxic:
+                    reasons = ", ".join([l['label'] for l in toxic_labels])
+                    await channel.send(f"🚨 **ALERTA TOXICITATE!** <@{user_id}>: \"{text}\"\nMotiv: `{reasons}`")
+                else:
+                    await channel.send(f"✅ <@{user_id}>: {text}")
 
+            elif BOT_MODE == "PREVENTIVE":
+                # Modul RELAY: Tu vorbești -> Bot Ascultă -> Bot Redă (dacă e ok)
+                if is_toxic:
+                    print(f"🛑 BLOCAT mesaj toxic de la {user_id}")
+                    await channel.send(f"🛡️ **Mesaj Blocat (Preventive):** <@{user_id}> a încercat să fie toxic!")
+                    os.remove(filename) # Ștergem dovada, nimeni nu aude nimic
+                else:
+                    print(f"✅ Mesaj OK. Redare către ceilalți...")
+                    if current_voice_client:
+                        # Redăm sunetul original înapoi
+                        await play_audio_back(current_voice_client, filename)
+                    # Nu ștergem imediat fișierul că încă se redă (cleanup-ul e mai complex aici, dar pt demo e ok)
+
+async def play_audio_back(voice_client, filename):
+    """Redă fișierul audio înapoi în canal (Pentru modul Preventive)."""
+    while voice_client.is_playing():
+        await asyncio.sleep(0.1)
+    # FFmpegPCMAudio redă fișierul salvat pe disc
+    voice_client.play(discord.FFmpegPCMAudio(filename))
+    
 async def record_loop(ctx):
     """Bucla infinită care înregistrează în bucăți de 5 secunde."""
     global is_recording, current_voice_client
