@@ -2,68 +2,56 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
+import aiohttp
+import ctypes.util
 from dotenv import load_dotenv
 from faster_whisper import WhisperModel
-import time
-from discord import opus  # <--- Importă modulul opus
-import ctypes.util
-import aiohttp
+from discord import opus
 
-# --- FIX PENTRU WSL/LINUX: ÎNCĂRCARE MANUALĂ OPUS ---
+# --- FIX PENTRU WSL/LINUX ---
 if not opus.is_loaded():
-    # Caută biblioteca în sistem
-    opus_path = ctypes.util.find_library('opus')
-    if opus_path:
-        print(f"📚 Am găsit libopus la: {opus_path}")
-        opus.load_opus(opus_path)
-    else:
-        # Fallback dacă find_library nu o găsește (uzual în WSL Ubuntu)
-        try:
-            opus.load_opus("libopus.so.0")
-            print("📚 Am încărcat forțat libopus.so.0")
-        except Exception as e:
-            print("❌ CRITIC: Nu pot încărca biblioteca Opus! Audio nu va merge.")
-            print(f"Eroare: {e}")
+    try:
+        opus_path = ctypes.util.find_library('opus')
+        if opus_path:
+            opus.load_opus(opus_path)
+        else:
+            opus.load_opus("libopus.so.0") # Fallback standard
+    except Exception as e:
+        print("❌ EROARE OPUS: Nu pot încărca biblioteca audio sistem!")
 
 # ---------------- CONFIGURARE ----------------
-# Încărcăm variabilele
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN', '1234')
-BOT_MODE = os.getenv('BOT_MODE', 'REACTIVE').upper()
+TOKEN = os.getenv('DISCORD_TOKEN')
+BOT_MODE = os.getenv('BOT_MODE', 'PREVENTIVE').upper() # Default pe Preventive ca să testăm nebunia
 TOXICITY_API_URL = os.getenv('TOXICITY_API_URL', 'http://127.0.0.1:8000/check')
 
-print(f"BOT RUNS IN {BOT_MODE} MODE")
-print(f'Toxic api checker runs at {TOXICITY_API_URL}')
+print(f"🤖 BOT PORNIT ÎN MODUL: [ {BOT_MODE} ]")
+print(f"🔗 API Check: {TOXICITY_API_URL}")
 
-# Încărcăm modelul Whisper O SINGURĂ DATĂ (la start)
-print("⏳ Se încarcă modelul Whisper (poate dura 10-20 secunde)...")
-# Folosim 'base.en' pentru viteză pe CPU
+print("⏳ Se încarcă Whisper...")
 MODEL = WhisperModel("base.en", device="cpu", compute_type="int8")
-print("✅ Model Whisper încărcat!")
+print("✅ Whisper Gata!")
 
-# Configurare Bot Discord
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Variabilă globală să controlăm bucla de înregistrare
 is_recording = False
 current_voice_client = None
 
-# ---------------- FUNCȚII DE PROCESARE ----------------
+# ---------------- FUNCȚII DE LOGICĂ ----------------
 
-def transcribe_audio(audio_file_path):
-    """Primește calea către un wav și returnează textul."""
+def transcribe_audio(filename):
+    """Procesare CPU Whisper."""
     try:
-        segments, _ = MODEL.transcribe(audio_file_path, beam_size=5)
-        text = " ".join([segment.text for segment in segments])
-        return text.strip()
+        segments, _ = MODEL.transcribe(filename, beam_size=5)
+        return " ".join([s.text for s in segments]).strip()
     except Exception as e:
-        print(f"Eroare Whisper: {e}")
+        print(f"Err Whisper: {e}")
         return ""
 
 async def check_toxicity(text):
-    """Întreabă API-ul dacă textul e toxic."""
+    """Apel HTTP către microserviciu."""
     async with aiohttp.ClientSession() as session:
         try:
             payload = {"text": text, "threshold": 0.5}
@@ -72,14 +60,28 @@ async def check_toxicity(text):
                     data = await resp.json()
                     return data.get("toxic_labels", [])
         except Exception as e:
-            print(f"⚠️ Nu pot contacta API-ul de toxicitate: {e}")
-            return []
+            print(f"⚠️ Eroare API: {e}")
     return []
 
+async def play_audio_back(voice_client, filename):
+    """Redă fișierul audio doar dacă utilizatorul nu a fost toxic."""
+    # Așteptăm să fie liber canalul de ieșire
+    while voice_client.is_playing():
+        await asyncio.sleep(0.1)
+    
+    # Specificăm calea către ffmpeg explicit dacă e nevoie, altfel default
+    # Pe Linux/WSL de obicei merge default dacă e instalat cu apt
+    voice_client.play(discord.FFmpegPCMAudio(filename))
+    
+    # Așteptăm să termine redarea ca să putem șterge fișierul
+    while voice_client.is_playing():
+        await asyncio.sleep(0.5)
+
 async def processing_callback(sink, channel):
+    """Creierul care decide cine se aude și cine nu."""
     for user_id, audio in sink.audio_data.items():
         if audio:
-            # 1. Salvare Audio
+            # 1. Nume unic fisier
             filename = f"user_{user_id}_{int(asyncio.get_event_loop().time())}.wav"
             with open(filename, "wb") as f:
                 f.write(audio.file.read())
@@ -88,7 +90,7 @@ async def processing_callback(sink, channel):
             text = await asyncio.to_thread(transcribe_audio, filename)
             
             if not text:
-                os.remove(filename)
+                os.remove(filename) # Liniște = Gunoi
                 continue
 
             print(f"🗣️ User {user_id}: {text}")
@@ -97,107 +99,79 @@ async def processing_callback(sink, channel):
             toxic_labels = await check_toxicity(text)
             is_toxic = len(toxic_labels) > 0
 
-            # --- LOGICA DE DISERTAȚIE ---
-            
+            # ---------------- MOD REACTIVE (Simplu) ----------------
             if BOT_MODE == "REACTIVE":
-                # Modul CLASIC: Se aude tot, pedepsim după.
-                os.remove(filename) # Nu ne mai trebuie sunetul
+                os.remove(filename) # Ștergem audio, s-a auzit deja live
                 if is_toxic:
                     reasons = ", ".join([l['label'] for l in toxic_labels])
-                    await channel.send(f"🚨 **ALERTA TOXICITATE!** <@{user_id}>: \"{text}\"\nMotiv: `{reasons}`")
+                    await channel.send(f"🚨 **ALERTA (Reactive):** <@{user_id}>: \"{text}\"\nMotiv: `{reasons}`")
                 else:
                     await channel.send(f"✅ <@{user_id}>: {text}")
 
+            # ---------------- MOD PREVENTIVE (Relay/Nebunia) ----------------
             elif BOT_MODE == "PREVENTIVE":
-                # Modul RELAY: Tu vorbești -> Bot Ascultă -> Bot Redă (dacă e ok)
                 if is_toxic:
+                    # E TOXIC? -> NU REDĂM NIMIC.
                     print(f"🛑 BLOCAT mesaj toxic de la {user_id}")
                     await channel.send(f"🛡️ **Mesaj Blocat (Preventive):** <@{user_id}> a încercat să fie toxic!")
-                    os.remove(filename) # Ștergem dovada, nimeni nu aude nimic
+                    os.remove(filename) # Ștergem dovada
                 else:
+                    # E CUMINTE? -> REDĂM AUDIO.
                     print(f"✅ Mesaj OK. Redare către ceilalți...")
-                    if current_voice_client:
-                        # Redăm sunetul original înapoi
+                    if current_voice_client and current_voice_client.is_connected():
                         await play_audio_back(current_voice_client, filename)
-                    # Nu ștergem imediat fișierul că încă se redă (cleanup-ul e mai complex aici, dar pt demo e ok)
+                        
+                        # Curățenie după redare
+                        try:
+                            os.remove(filename)
+                        except:
+                            pass
+                    else:
+                        os.remove(filename)
 
-async def play_audio_back(voice_client, filename):
-    """Redă fișierul audio înapoi în canal (Pentru modul Preventive)."""
-    while voice_client.is_playing():
-        await asyncio.sleep(0.1)
-    # FFmpegPCMAudio redă fișierul salvat pe disc
-    voice_client.play(discord.FFmpegPCMAudio(filename))
-    
 async def record_loop(ctx):
-    """Bucla infinită care înregistrează în bucăți de 5 secunde."""
     global is_recording, current_voice_client
-    
     while is_recording and current_voice_client and current_voice_client.is_connected():
-        # 1. Pregătim Sink-ul (cel care prinde audio)
-        # Filters={'time': 0} înseamnă că nu tăiem liniștea, luăm tot
         sink = discord.sinks.WaveSink()
-        
-        # 2. Pornim înregistrarea
-        current_voice_client.start_recording(
-            sink, 
-            processing_callback, # Funcția care se apelează la stop
-            ctx.channel # Argument extra trimis către callback
-        )
-        
-        # 3. Așteptăm X secunde (fereastra de timp)
-        await asyncio.sleep(4) 
-        
-        # 4. Oprim înregistrarea (Asta declanșează processing_callback)
+        # Ascultă 4 secunde (Aici se creează buffer-ul de întârziere)
+        current_voice_client.start_recording(sink, processing_callback, ctx.channel)
+        await asyncio.sleep(2.2) 
         current_voice_client.stop_recording()
-        
-        # Așteptăm puțin să se proceseze callback-ul înainte de a relua
-        # (Nu e obligatoriu, dar ajută la stabilitate)
-        await asyncio.sleep(0.5)
 
-# ---------------- COMENZI BOT ----------------
+# ---------------- COMENZI ----------------
 
 @bot.event
 async def on_ready():
-    print(f'✅ Bot conectat ca: {bot.user}')
+    print(f'✅ Bot conectat: {bot.user}')
 
 @bot.command()
 async def join(ctx):
     global is_recording, current_voice_client
+    if ctx.author.voice is None: return await ctx.send("❌ Intră în voce!")
     
-    if ctx.author.voice is None:
-        await ctx.send("❌ Intră întâi într-un canal de voce!")
-        return
-
     channel = ctx.author.voice.channel
-    
-    # Conectare
-    if ctx.voice_client is not None:
-        await ctx.voice_client.move_to(channel)
-        current_voice_client = ctx.voice_client
-    else:
-        current_voice_client = await channel.connect()
+    if ctx.voice_client: current_voice_client = ctx.voice_client
+    else: current_voice_client = await channel.connect()
 
-    await ctx.send(f"🔊 Conectat la **{channel.name}**. Încep ascultarea...")
+    await ctx.send(f"🎙️ **ToxicGuard Activat**\nMod: `{BOT_MODE}`\nCanal: `{channel.name}`")
     
-    # Pornim bucla de înregistrare
+    if BOT_MODE == "PREVENTIVE":
+        await ctx.send(
+            "⚠️ **INSTRUCȚIUNI MOD PREVENTIVE:**\n"
+            "1. Dați **MUTE (Click Dreapta)** tuturor celorlalți participanți.\n"
+            "2. Lăsați **DOAR BOTUL** cu sunet.\n"
+            "3. Vorbiți normal. Botul vă va reda vocea doar dacă nu este toxică."
+        )
+
     is_recording = True
     bot.loop.create_task(record_loop(ctx))
 
 @bot.command()
 async def leave(ctx):
     global is_recording
-    is_recording = False # Oprim bucla
-    
-    if ctx.voice_client:
-        await ctx.voice_client.disconnect()
-        await ctx.send("👋 Deconectat.")
-
-@bot.command()
-async def ping(ctx):
-    await ctx.send("pong")
+    is_recording = False
+    if ctx.voice_client: await ctx.voice_client.disconnect()
+    await ctx.send("👋")
 
 if __name__ == "__main__":
-    if not TOKEN:
-        print("❌ Nu am găsit token-ul!")
-    else:
-        bot.run(TOKEN)
+    bot.run(TOKEN)
