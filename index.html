@@ -1,127 +1,345 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Toxic-Free Walkie Talkie</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ToxicGuard Walkie</title>
     <style>
-        body { font-family: 'Arial', sans-serif; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #status { margin-bottom: 20px; height: 30px; color: #aaa; }
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #3b82f6;
+            --error-color: #ef4444;
+            --success-color: #10b981;
+            --text-color: #e5e5e5;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- LAYOUT GRID --- */
+        .app-container {
+            display: flex;
+            flex: 1;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Stânga: Butonul */
+        .main-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            border-right: 1px solid #333;
+        }
+
+        /* Dreapta: User List */
+        .users-panel {
+            flex: 1;
+            background-color: #181818;
+            border-left: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            min-width: 250px;
+            max-width: 350px;
+        }
+
+        /* Responsive pentru Mobil */
+        @media (max-width: 768px) {
+            .app-container { flex-direction: column; }
+            .main-section { flex: 3; border-right: none; border-bottom: 1px solid #333; }
+            .users-panel { flex: 2; min-width: 100%; max-width: 100%; }
+        }
+
+        /* Users Panel Styling */
+        .panel-header {
+            padding: 15px;
+            background: #222;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #users-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .user-card {
+            padding: 12px 15px;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        .user-card:hover { background: #222; }
+
+        .user-avatar {
+            width: 35px; height: 35px;
+            border-radius: 50%;
+            background: #444;
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+            position: relative;
+        }
+        
+        /* Indicator vorbire */
+        .user-card.speaking .user-avatar {
+            background: var(--success-color);
+            box-shadow: 0 0 15px var(--success-color);
+            animation: speak-pulse 1s infinite;
+        }
+        .user-card.speaking .user-name {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        @keyframes speak-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* --- RESTUL STILURILOR (Overlay, Buton, etc) --- */
+        /* (Pastram stilurile tale vechi aici, le-am integrat mai jos) */
         
         #talk-btn {
-            width: 200px; height: 200px; border-radius: 50%; border: none;
-            background-color: #007bff; color: white; font-size: 24px; font-weight: bold;
-            cursor: pointer; box-shadow: 0 0 20px rgba(0,123,255,0.5);
-            transition: all 0.2s; user-select: none;
+            width: 200px; height: 200px;
+            border-radius: 50%;
+            border: 8px solid #2a2a2a;
+            background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+            outline: none; user-select: none; -webkit-tap-highlight-color: transparent;
         }
-        #talk-btn:active { background-color: #ff4444; transform: scale(0.95); box-shadow: 0 0 30px rgba(255,68,68,0.6); }
-        #talk-btn.recording { background-color: #ff4444; content: "REC"; }
+        #talk-btn:active, #talk-btn.recording {
+            transform: scale(0.95);
+            border-color: var(--error-color); color: var(--error-color);
+            box-shadow: 0 0 50px rgba(239, 68, 68, 0.4);
+        }
 
-        #log { width: 80%; max-width: 600px; height: 200px; overflow-y: auto; background: #2d2d2d; padding: 10px; border-radius: 8px; margin-top: 20px; border: 1px solid #444; }
-        .log-item { padding: 5px; border-bottom: 1px solid #333; }
-        .toxic { color: #ff4444; font-weight: bold; }
-        .safe { color: #00cc66; }
+        /* Logs - Acum le punem sub buton */
+        #log-container {
+            width: 80%;
+            height: 100px;
+            margin-top: 20px;
+            overflow-y: auto;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .log-item { margin-bottom: 5px; opacity: 0.8; }
+        .log-item.toxic { color: var(--error-color); font-weight: bold; }
+        .log-item.safe { color: var(--success-color); }
+        
+        /* Overlay */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.5s;
+        }
+        #username-input { padding: 15px; font-size: 1.2rem; border-radius: 10px; border: 2px solid #333; background: #222; color: white; margin-bottom: 20px; text-align: center; outline: none; }
+        #start-btn { padding: 15px 40px; font-size: 1.2rem; background: var(--primary-color); color: white; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; }
+
     </style>
 </head>
 <body>
 
-    <h1 style="color: #007bff;">🛡️ Secure Voice Chat</h1>
-    <div id="status">Conectare la server...</div>
+    <div id="overlay">
+        <h2 style="color: white; margin-bottom: 20px;">ToxicGuard Login</h2>
+        <input type="text" id="username-input" placeholder="Numele tău..." maxlength="12">
+        <button id="start-btn" onclick="joinChannel()">CONNECT</button>
+    </div>
 
-    <button id="talk-btn" onmousedown="startRecording()" onmouseup="stopRecording()" ontouchstart="startRecording()" ontouchend="stopRecording()">
-        HOLD TO TALK
-    </button>
+    <div class="app-container">
+        
+        <div class="main-section">
+            <h1 style="position: absolute; top: 20px; color: #555;">TOXICGUARD</h1>
+            
+            <button id="talk-btn" 
+                onmousedown="startRecording(event)" 
+                onmouseup="stopRecording(event)" 
+                onmouseleave="stopRecording(event)"
+                ontouchstart="startRecording(event)" 
+                ontouchend="stopRecording(event)">
+                HOLD TO<br>SPEAK
+            </button>
 
-    <div id="log"></div>
+            <div id="log-container">
+                <div style="color: #444;">Status logs will appear here...</div>
+            </div>
+        </div>
+
+        <div class="users-panel">
+            <div class="panel-header">
+                <span>ONLINE USERS</span>
+                <span id="user-count" style="background: #333; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">0</span>
+            </div>
+            <ul id="users-list">
+                </ul>
+        </div>
+    </div>
 
     <script>
-        // 1. Conectare WebSocket
-        var client_id = Date.now();
-        var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-        var wsUrl = `${protocol}${window.location.host}/ws/${client_id}`;
+        var ws;
+        var mediaRecorder;
+        let audioChunks = [];
+        var myUsername = "";
+
+        function joinChannel() {
+            var inputName = document.getElementById('username-input').value.trim();
+            if(!inputName) { alert("Introdu un nume!"); return; }
+            myUsername = inputName;
+
+            document.getElementById('overlay').style.opacity = '0';
+            setTimeout(() => { document.getElementById('overlay').style.display = 'none'; }, 500);
+
+            var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            audioCtx.resume();
+
+            connectWebSocket(myUsername);
+            setupMicrophone();
+        }
+
+        function connectWebSocket(username) {
+            var client_id = Date.now();
+            var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+            ws = new WebSocket(`${protocol}${window.location.host}/ws/${client_id}?username=${encodeURIComponent(username)}`);
+            ws.binaryType = "blob";
+
+            ws.onmessage = async (event) => {
+                if (typeof event.data === "string") {
+                    var data = JSON.parse(event.data);
+                    
+                    // 1. PRIMIM LISTA DE USERI
+                    if (data.type === "user_list") {
+                        updateUserList(data.users);
+                    }
+                    // 2. CINEVA VORBEȘTE (ÎNCEPE ANIMAȚIA)
+                    else if (data.type === "speaking_start") {
+                        highlightSpeaker(data.user);
+                    }
+                    // 3. MESAJE STATUS/TOXIC
+                    else if (data.type === "status" || data.type === "system") {
+                        logMessage(data.message, data.status || "system");
+                        if(data.status === "toxic" && navigator.vibrate) navigator.vibrate(200);
+                    }
+
+                } else {
+                    // AUDIO PLAYBACK
+                    var blob = event.data;
+                    var audioUrl = URL.createObjectURL(blob);
+                    var audio = new Audio(audioUrl);
+                    try { await audio.play(); } catch (e) {}
+                }
+            };
+        }
+
+        // --- FUNCȚII UI PENTRU PANEL ---
         
-        console.log("Connecting to:", wsUrl); // Pentru debugging
-        var ws = new WebSocket(wsUrl);
-        ws.onopen = () => { document.getElementById("status").innerText = "✅ Conectat - Apasă butonul pentru a vorbi"; };
-        
-        // 2. Gestionare Audio Primit (Playback)
-        ws.onmessage = async (event) => {
-            if (typeof event.data === "string") {
-                // Mesaj Text (Status)
-                var data = JSON.parse(event.data);
-                logMessage(data.message, data.status);
-            } else {
-                // Mesaj Audio (Blob) -> Play
-                var blob = event.data;
-                var audioUrl = URL.createObjectURL(blob);
-                var audio = new Audio(audioUrl);
-                audio.play();
-                logMessage("🔊 Cineva vorbește...", "safe");
+        function updateUserList(users) {
+            var list = document.getElementById("users-list");
+            document.getElementById("user-count").innerText = users.length;
+            list.innerHTML = ""; // Curățăm lista
+
+            users.forEach(user => {
+                var li = document.createElement("li");
+                li.className = "user-card";
+                li.id = "user-card-" + user; // ID ca să-l găsim ușor
+                
+                // Avatar (Prima literă)
+                var initial = user.charAt(0).toUpperCase();
+                
+                li.innerHTML = `
+                    <div class="user-avatar">${initial}</div>
+                    <div class="user-name">${user} ${user === myUsername ? '(Tu)' : ''}</div>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function highlightSpeaker(username) {
+            // Găsim cardul userului
+            var card = document.getElementById("user-card-" + username);
+            if (card) {
+                // Adăugăm clasa de animație
+                card.classList.add("speaking");
+                
+                // O scoatem după 2 secunde (sau cât ține fraza)
+                // Resetăm timerul dacă vorbește iar
+                if (card.timeout) clearTimeout(card.timeout);
+                
+                card.timeout = setTimeout(() => {
+                    card.classList.remove("speaking");
+                }, 2000);
             }
-        };
+        }
 
         function logMessage(msg, type) {
-            var log = document.getElementById("log");
-            var item = document.createElement("div");
-            item.className = "log-item " + type;
-            item.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            log.prepend(item);
+            var container = document.getElementById("log-container");
+            var div = document.createElement("div");
+            div.className = "log-item " + type;
+            div.innerText = msg;
+            container.prepend(div);
+            // Păstrăm doar ultimele 3 mesaje ca să nu aglomerăm
+            if(container.children.length > 3) container.lastChild.remove();
         }
 
-        // 3. Înregistrare Microfon
-        let mediaRecorder;
-        let audioChunks = [];
+        // --- MICROFON LOGIC ---
+        function setupMicrophone() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                let options = { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 16000 };
+                if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) options = { mimeType: 'audio/webm' };
+                try { mediaRecorder = new MediaRecorder(stream, options); } catch(e) { mediaRecorder = new MediaRecorder(stream); }
 
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-
-			// --- OPTIMIZARE BITRATE ---
-                // Reducem calitatea la 16kbps (suficient pentru voce, foarte rapid la upload)
-                let options = { 
-                    mimeType: 'audio/webm;codecs=opus',
-                    audioBitsPerSecond: 16000 
-                };
-                
-                // Fallback-uri pentru compatibilitate
-                if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                    options = { mimeType: 'audio/webm' };
-                }
-                if (!MediaRecorder.isTypeSupported('audio/webm')) {
-                    options = {}; // Default browser
-                }
-                
-                try {
-                    mediaRecorder = new MediaRecorder(stream, options);
-                } catch (e) {
-                    mediaRecorder = new MediaRecorder(stream);
-                }
-
-                
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-
+                mediaRecorder.ondataavailable = e => { if(e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    // Trimitem la server
-                    ws.send(audioBlob);
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if(ws.readyState === 1) ws.send(blob);
                     audioChunks = [];
-                    document.getElementById("status").innerText = "⏳ Se analizează...";
                 };
             });
+        }
 
-        function startRecording() {
+        function startRecording(e) {
+            if(e) { e.preventDefault(); e.stopPropagation(); }
             if (mediaRecorder && mediaRecorder.state === "inactive") {
-                audioChunks = [];
-                mediaRecorder.start();
-                document.getElementById("talk-btn").innerText = "RECORDING...";
-                document.getElementById("talk-btn").style.backgroundColor = "#ff4444";
+                audioChunks = []; mediaRecorder.start();
+                var btn = document.getElementById("talk-btn");
+                btn.classList.add("recording"); btn.innerText = "LISTENING...";
+                if(navigator.vibrate) navigator.vibrate(50);
             }
         }
 
-        function stopRecording() {
+        function stopRecording(e) {
+            if(e) { e.preventDefault(); e.stopPropagation(); }
             if (mediaRecorder && mediaRecorder.state === "recording") {
                 mediaRecorder.stop();
-                document.getElementById("talk-btn").innerText = "HOLD TO TALK";
-                document.getElementById("talk-btn").style.backgroundColor = "#007bff";
+                var btn = document.getElementById("talk-btn");
+                btn.classList.remove("recording"); btn.innerHTML = "HOLD TO<br>SPEAK";
             }
         }
     </script>
