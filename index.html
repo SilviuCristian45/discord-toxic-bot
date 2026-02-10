@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Toxic-Free Walkie Talkie</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #status { margin-bottom: 20px; height: 30px; color: #aaa; }
+        
+        #talk-btn {
+            width: 200px; height: 200px; border-radius: 50%; border: none;
+            background-color: #007bff; color: white; font-size: 24px; font-weight: bold;
+            cursor: pointer; box-shadow: 0 0 20px rgba(0,123,255,0.5);
+            transition: all 0.2s; user-select: none;
+        }
+        #talk-btn:active { background-color: #ff4444; transform: scale(0.95); box-shadow: 0 0 30px rgba(255,68,68,0.6); }
+        #talk-btn.recording { background-color: #ff4444; content: "REC"; }
+
+        #log { width: 80%; max-width: 600px; height: 200px; overflow-y: auto; background: #2d2d2d; padding: 10px; border-radius: 8px; margin-top: 20px; border: 1px solid #444; }
+        .log-item { padding: 5px; border-bottom: 1px solid #333; }
+        .toxic { color: #ff4444; font-weight: bold; }
+        .safe { color: #00cc66; }
+    </style>
+</head>
+<body>
+
+    <h1 style="color: #007bff;">🛡️ Secure Voice Chat</h1>
+    <div id="status">Conectare la server...</div>
+
+    <button id="talk-btn" onmousedown="startRecording()" onmouseup="stopRecording()" ontouchstart="startRecording()" ontouchend="stopRecording()">
+        HOLD TO TALK
+    </button>
+
+    <div id="log"></div>
+
+    <script>
+        // 1. Conectare WebSocket
+        var client_id = Date.now();
+        var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        var wsUrl = `${protocol}${window.location.host}/ws/${client_id}`;
+        
+        console.log("Connecting to:", wsUrl); // Pentru debugging
+        var ws = new WebSocket(wsUrl);
+        ws.onopen = () => { document.getElementById("status").innerText = "✅ Conectat - Apasă butonul pentru a vorbi"; };
+        
+        // 2. Gestionare Audio Primit (Playback)
+        ws.onmessage = async (event) => {
+            if (typeof event.data === "string") {
+                // Mesaj Text (Status)
+                var data = JSON.parse(event.data);
+                logMessage(data.message, data.status);
+            } else {
+                // Mesaj Audio (Blob) -> Play
+                var blob = event.data;
+                var audioUrl = URL.createObjectURL(blob);
+                var audio = new Audio(audioUrl);
+                audio.play();
+                logMessage("🔊 Cineva vorbește...", "safe");
+            }
+        };
+
+        function logMessage(msg, type) {
+            var log = document.getElementById("log");
+            var item = document.createElement("div");
+            item.className = "log-item " + type;
+            item.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            log.prepend(item);
+        }
+
+        // 3. Înregistrare Microfon
+        let mediaRecorder;
+        let audioChunks = [];
+
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+
+			// --- OPTIMIZARE BITRATE ---
+                // Reducem calitatea la 16kbps (suficient pentru voce, foarte rapid la upload)
+                let options = { 
+                    mimeType: 'audio/webm;codecs=opus',
+                    audioBitsPerSecond: 16000 
+                };
+                
+                // Fallback-uri pentru compatibilitate
+                if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    options = { mimeType: 'audio/webm' };
+                }
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = {}; // Default browser
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(stream, options);
+                } catch (e) {
+                    mediaRecorder = new MediaRecorder(stream);
+                }
+
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // Trimitem la server
+                    ws.send(audioBlob);
+                    audioChunks = [];
+                    document.getElementById("status").innerText = "⏳ Se analizează...";
+                };
+            });
+
+        function startRecording() {
+            if (mediaRecorder && mediaRecorder.state === "inactive") {
+                audioChunks = [];
+                mediaRecorder.start();
+                document.getElementById("talk-btn").innerText = "RECORDING...";
+                document.getElementById("talk-btn").style.backgroundColor = "#ff4444";
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                document.getElementById("talk-btn").innerText = "HOLD TO TALK";
+                document.getElementById("talk-btn").style.backgroundColor = "#007bff";
+            }
+        }
+    </script>
+</body>
+</html>
