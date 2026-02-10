@@ -1,0 +1,4 @@
+timestamp,user,text,toxic_labels,stt_time,ai_time,latency_ms,user_count
+2026-02-10 15:24:30,64u4,This is the tunnel.,SAFE,316.47,30.48,346.95,2
+2026-02-10 15:24:44,64u4,"Fuck you man, fuck you.",toxic,290.98,24.17,315.15,2
+2026-02-10 15:24:53,64u4,"Fuck you, fuck you, fuck you.",toxic,337.15,25.63,362.78,2

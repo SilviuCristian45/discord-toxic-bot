@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToxicGuard Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #3b82f6; text-align: center; }
+        
+        .chart-wrapper {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            margin-bottom: 30px;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #1e1e1e; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        th { background-color: #222; color: #aaa; }
+        .toxic-row { color: #ef4444; }
+        .safe-row { color: #10b981; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Performanță Sistem</h1>
+    
+    <div class="chart-wrapper">
+        <canvas id="performanceChart"></canvas>
+    </div>
+
+    <h2>Istoric Detaliat</h2>
+    <table id="logsTable">
+        <thead>
+            <tr>
+                <th>Data/Ora</th>
+                <th>User</th>
+                <th>Mesaj</th>
+                <th>Latență (ms)</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+</div>
+
+<script>
+    async function loadData() {
+        // 1. Luăm datele din CSV prin API
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+
+        // 2. Pregătim datele pentru Chart.js
+        const labels = data.map(row => row.timestamp.split(" ")[1]); // Luăm doar ora (HH:MM:SS)
+        const latencyData = data.map(row => parseFloat(row.latency_ms));
+        const userData = data.map(row => parseInt(row.user_count));
+
+        // 3. Desenăm Graficul
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Latență (ms)',
+                        data: latencyData,
+                        borderColor: '#3b82f6', // Albastru
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        yAxisID: 'y',
+                        tension: 0.4, // Linie curbă
+                        fill: true
+                    },
+                    {
+                        label: 'Useri Conectați',
+                        data: userData,
+                        borderColor: '#f97316', // Portocaliu
+                        backgroundColor: '#f97316',
+                        type: 'bar', // Bar Chart combinat
+                        yAxisID: 'y1',
+                        barThickness: 10
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Milisecunde' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false }, // Ascunde grid-ul din dreapta
+                        title: { display: true, text: 'Nr. Useri' },
+                        min: 0,
+                        suggestedMax: 10
+                    }
+                }
+            }
+        });
+
+        // 4. Populăm Tabelul
+        const tableBody = document.querySelector("#logsTable tbody");
+        // Inversăm ca să vedem ultimele primele
+        data.slice().reverse().forEach(row => {
+            const tr = document.createElement("tr");
+            const isToxic = row.toxic_labels !== "SAFE";
+            tr.className = isToxic ? "toxic-row" : "safe-row";
+            
+            tr.innerHTML = `
+                <td>${row.timestamp}</td>
+                <td>${row.user}</td>
+                <td>${row.text}</td>
+                <td>${row.latency_ms} ms</td>
+                <td>${isToxic ? "⚠️ " + row.toxic_labels : "✅ SAFE"}</td>
+            `;
+            tableBody.appendChild(tr);
+        });
+    }
+
+    // Încărcăm la pornire
+    loadData();
+    // Reîncărcăm la fiecare 5 secunde (Live Dashboard)
+    setInterval(loadData, 5000);
+
+</script>
+
+</body>
+</html>
