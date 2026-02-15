@@ -1,0 +1,101 @@
+id,text,expected_label
+1,You are completely useless and nobody likes you,TOXIC
+2,Shut your mouth you are so annoying,TOXIC
+3,I hope you fail at everything you try,TOXIC
+4,You look absolutely disgusting today,TOXIC
+5,Get out of my sight before I make you leave,TOXIC
+6,You are the worst player I have ever seen,TOXIC
+7,Why are you even trying Just give up,TOXIC
+8,Nobody wants to listen to your stupid voice,TOXIC
+9,You are a waste of space and time,TOXIC
+10,I hate you more than anyone else in this world,TOXIC
+11,Stop talking nobody cares about your opinion,TOXIC
+12,You are pathetic and weak,TOXIC
+13,Go away and never come back here,TOXIC
+14,Everyone is laughing at you behind your back,TOXIC
+15,You are an idiot for thinking that would work,TOXIC
+16,You ruin every game we play,TOXIC
+17,Please delete the game you are trash,TOXIC
+18,I cannot believe how stupid you are,TOXIC
+19,Your existence is a mistake,TOXIC
+20,Don't ever speak to me again loser,TOXIC
+21,You are so ugly it hurts my eyes,TOXIC
+22,Are you mentally slow or just acting like it,TOXIC
+23,I wish you would just disappear forever,TOXIC
+24,You bring nothing of value to this team,TOXIC
+25,Only a moron would make that mistake,TOXIC
+26,You suck at this game uninstall it,TOXIC
+27,I am going to report you for being terrible,TOXIC
+28,Listen to me you little piece of garbage,TOXIC
+29,You have absolutely no friends for a reason,TOXIC
+30,Keep crying nobody feels sorry for you,TOXIC
+31,You are dirt to me completely beneath me,TOXIC
+32,Shut up nobody asked for your input,TOXIC
+33,You will never achieve anything in life,TOXIC
+34,I am sick and tired of your stupidity,TOXIC
+35,You are a terrible person inside and out,TOXIC
+36,Don't make me come over there and hurt you,TOXIC
+37,You are acting like a complete clown,TOXIC
+38,Stop wasting our time with your incompetence,TOXIC
+39,I despise everything about you,TOXIC
+40,You are nothing but a failure,TOXIC
+41,Take your stupid ideas somewhere else,TOXIC
+42,You are arguably the dumbest person here,TOXIC
+43,I'm going to mute you because you are toxic,TOXIC
+44,You deserve all the bad things happening to you,TOXIC
+45,Look in the mirror and see a loser,TOXIC
+46,You are annoying everyone in this channel,TOXIC
+47,I have zero respect for people like you,TOXIC
+48,Why don't you just go kill your connection,TOXIC
+49,You are a joke to this community,TOXIC
+50,Leave the server right now nobody wants you,TOXIC
+51,Hello how are you doing today,SAFE
+52,The weather outside is really nice and sunny,SAFE
+53,I think we should work together on this project,SAFE
+54,Can you please pass me the salt,SAFE
+55,I really enjoy playing video games with friends,SAFE
+56,What time is the meeting scheduled for,SAFE
+57,I am going to the store to buy some bread,SAFE
+58,This is a very interesting book I am reading,SAFE
+59,Let's try to win this match together,SAFE
+60,Have you seen the latest movie that came out,SAFE
+61,Good luck on your exam tomorrow morning,SAFE
+62,I appreciate your help with my homework,SAFE
+63,My favorite color is blue what is yours,SAFE
+64,Please let me know when you arrive home,SAFE
+65,I need to charge my phone the battery is low,SAFE
+66,The coffee at this place is really delicious,SAFE
+67,We are planning a trip to the mountains next week,SAFE
+68,Can you hear me clearly on this microphone,SAFE
+69,I learned a new programming language recently,SAFE
+70,It is important to stay hydrated during the day,SAFE
+71,Let's meet at the park around five o'clock,SAFE
+72,Thank you for being so kind to me,SAFE
+73,I forgot my keys in the car I'll be right back,SAFE
+74,The internet connection seems very stable today,SAFE
+75,Have a wonderful weekend with your family,SAFE
+76,I am looking forward to our vacation next summer,SAFE
+77,Could you please explain that concept again,SAFE
+78,The pizza we ordered just arrived at the door,SAFE
+79,I usually wake up at seven in the morning,SAFE
+80,Technology is advancing very rapidly these days,SAFE
+81,It was nice talking to you see you later,SAFE
+82,I need to finish writing this report by tonight,SAFE
+83,Do you prefer tea or coffee in the morning,SAFE
+84,This song reminds me of my childhood,SAFE
+85,Let's collaborate to find the best solution,SAFE
+86,I am very proud of what we achieved today,SAFE
+87,Please remember to turn off the lights,SAFE
+88,Is there anything else I can help you with,SAFE
+89,The sunset looks absolutely beautiful this evening,SAFE
+90,I have a lot of work to do this week,SAFE
+91,My computer is running very fast now,SAFE
+92,Let's go for a walk in the park later,SAFE
+93,I enjoy listening to music while I work,SAFE
+94,Can you recommend a good restaurant nearby,SAFE
+95,We should organize a team building event,SAFE
+96,I am learning how to cook new dishes,SAFE
+97,The train is arriving at the station now,SAFE
+98,I need to buy a birthday gift for my friend,SAFE
+99,Please send me the files via email,SAFE
+100,Everything is going according to plan,SAFE

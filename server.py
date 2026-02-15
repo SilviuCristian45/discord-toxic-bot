@@ -23,8 +23,10 @@ if not os.path.exists(CSV_FILE):
         # Header-ul CSV-ului
         writer.writerow(["timestamp", "user", "text", "toxic_labels", "stt_time", "ai_time", "latency_ms", "user_count"])
 
-print("🚀 Încărcare Whisper TURBO (tiny.en)...")
-model = WhisperModel("tiny.en", device="cpu", compute_type="int8", cpu_threads=4)
+WHISPER_TYPE = "base.en"
+print(f"🚀 Încărcare Whisper TURBO {WHISPER_TYPE}...")
+model = WhisperModel(WHISPER_TYPE, device="cpu", compute_type="int8", cpu_threads=4)
+
 print("✅ Whisper Gata!")
 
 # --- LOGARE ÎN CSV ---
